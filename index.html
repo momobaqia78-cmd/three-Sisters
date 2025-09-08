@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fa">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>بازی تئاتر</title>
+  <style>
+    body {
+      margin:0;
+      background:#111;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100vh;
+    }
+    canvas {
+      border:2px solid #fff;
+      border-radius:12px;
+      display:none;
+    }
+    #menu, #gameover {
+      position:absolute;
+      width:360px;
+      height:640px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      z-index:10;
+    }
+    #menu {
+      background:#111;
+    }
+    #menu img {
+      width:200px; height:auto;
+      margin:15px;
+      cursor:pointer;
+      transition:transform 0.2s;
+    }
+    #menu img:hover {
+      transform:scale(1.05);
+    }
+
+    #gameover {
+      background:#fff;
+      display:none;
+      justify-content:flex-start;
+      padding-top:40px;
+      align-items:center;
+      text-align:center;
+    }
+
+    #titleImg {
+      width:280px;
+      height:auto;
+      margin-bottom:30px;
+    }
+
+    #gameoverImg {
+      width:200px;
+      height:auto;
+      margin-bottom:30px;
+      animation: blink 1.2s infinite, pulse 1.2s infinite;
+    }
+
+    #ticketBtn {
+      width:180px;
+      height:auto;
+      cursor:pointer;
+      transition:transform 0.2s;
+    }
+
+    #ticketBtn:hover {
+      transform:scale(1.05);
+    }
+
+    @keyframes blink {
+      0%, 50%, 100% { opacity: 1; }
+      25%, 75% { opacity: 0; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    #funnyImg {
+      position:absolute;
+      top:35%; /* وسط صفحه */
+      left:50%;
+      transform: translate(-50%, -50%);
+      width:250px;
+      height:auto;
+      display:none;
+      animation: blink2 2s infinite;
+      z-index:15;
+    }
+
+    @keyframes blink2 {
+      0%, 50%, 100% { opacity: 1; }
+      25%, 75% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="menu">
+    <img id="btn1" src="assets/option1.png" alt="تئاتر">
+    <img id="btn2" src="assets/option2.png" alt="بازی">
+  </div>
+
+  <canvas id="game" width="360" height="640"></canvas>
+  <audio id="bgMusic" src="assets/music.mp3" loop></audio>
+  <audio id="jumpSound" src="assets/jump.mp3"></audio>
+
+  <div id="gameover">
+    <img id="titleImg" src="assets/title.png" alt="اسم نمایش">
+    <img id="gameoverImg" src="assets/gameover.png" alt="گیم اور">
+    <img id="ticketBtn" src="assets/ticket.png" alt="بلیت">
+  </div>
+
+  <img id="funnyImg" src="assets/funny.png" alt="شوخی">
+
+  <script>
+    const menu = document.getElementById("menu");
+    const btn1 = document.getElementById("btn1");
+    const btn2 = document.getElementById("btn2");
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const bgMusic = document.getElementById("bgMusic");
+    const jumpSound = document.getElementById("jumpSound");
+    const gameoverDiv = document.getElementById("gameover");
+    const ticketBtn = document.getElementById("ticketBtn");
+    const funnyImg = document.getElementById("funnyImg");
+
+    btn1.addEventListener("click", () => {
+      const maxX = canvas.width - btn1.clientWidth - 20;
+      const maxY = canvas.height - btn1.clientHeight - 20;
+      const randX = Math.random() * maxX;
+      const randY = Math.random() * maxY;
+      btn1.style.position = "absolute";
+      btn1.style.left = randX + "px";
+      btn1.style.top = randY + "px";
+    });
+
+    btn2.addEventListener("click", () => {
+      menu.style.display = "none";
+      canvas.style.display = "block";
+      bgMusic.play();
+      startGame();
+    });
+
+    ticketBtn.addEventListener("click", () => {
+      window.location.href = "https://www.tiwall.com";
+    });
+
+    const bgImage = new Image();
+    bgImage.src = "assets/background.png";
+
+    const playerImage = new Image();
+    playerImage.src = "assets/character.png";
+
+    const obstacleImages = [];
+    for (let i=1; i<=10; i++) {
+      let img = new Image();
+      img.src = `assets/obstacle${i}.png`;
+      obstacleImages.push(img);
+    }
+
+    let player = { x:50, y:450, w:50, h:180, vy:0 };
+    let gravity = 0.4;
+    let jumpForce = -18;
+    let ground = 580;
+    let obstacles = [];
+    let speed = 3;
+    let score = 0;
+    let gameOver = false;
+
+    function jump() {
+      if (!gameOver) {
+        player.vy = jumpForce;
+        jumpSound.currentTime = 0;
+        jumpSound.play();
+      }
+    }
+
+    window.addEventListener("keydown", jump);
+    window.addEventListener("mousedown", jump);
+    window.addEventListener("touchstart", jump);
+
+    function spawnObstacle() {
+      const w = 60, h = 120;
+      const img = obstacleImages[Math.floor(Math.random() * obstacleImages.length)];
+      obstacles.push({ x: canvas.width + 10, y: ground - h, w: w, h: h, img: img, passed: false });
+    }
+
+    function update() {
+      if (gameOver) return;
+
+      player.vy += gravity;
+      player.y += player.vy;
+      if (player.y + player.h > ground) {
+        player.y = ground - player.h;
+        player.vy = 0;
+      }
+
+      obstacles.forEach(o => o.x -= speed);
+
+      obstacles.forEach(o => {
+        if (!o.passed && player.x > o.x + o.w) {
+          score++;
+          o.passed = true;
+          // افزایش سرعت بعد از هر ۵ امتیاز ۲۵٪
+          if (score % 5 === 0) speed *= 1.25;
+        }
+      });
+
+      obstacles = obstacles.filter(o => o.x + o.w > 0);
+
+      obstacles.forEach(o => {
+        if (
+          player.x + player.w > o.x &&
+          player.x < o.x + o.w &&
+          player.y + player.h > o.y &&
+          player.y < o.y + o.h
+        ) {
+          gameOver = true;
+          bgMusic.pause();
+          canvas.style.display = "none";
+          gameoverDiv.style.display = "flex";
+        }
+      });
+
+      if(!gameOver && score >= 20 && score < 30){
+        funnyImg.style.display = "block";
+      } else {
+        funnyImg.style.display = "none";
+      }
+    }
+
+    function draw() {
+      ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(playerImage, player.x, player.y, player.w, player.h);
+      obstacles.forEach(o => ctx.drawImage(o.img, o.x, o.y, o.w, o.h));
+      ctx.fillStyle = "white";
+      ctx.font = "16px Arial";
+      ctx.fillText("امتیاز: " + score, 10, 20);
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function startGame() {
+      setInterval(() => { if (!gameOver) spawnObstacle(); }, 2000);
+      loop();
+    }
+  </script>
+</body>
+</html>
